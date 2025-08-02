@@ -46,6 +46,7 @@ export interface ViewerInfo {
 
 // Socket.IO event types for type safety
 export interface ServerToClientEvents {
+  // Custom application events
   'offer': (data: SignalingData) => void;
   'answer': (data: SignalingData) => void;
   'ice-candidate': (data: SignalingData) => void;
@@ -53,6 +54,15 @@ export interface ServerToClientEvents {
   'viewer-count': (count: number) => void;
   'stream-status': (isActive: boolean) => void;
   'error': (message: string) => void;
+  
+  // Reserved Socket.IO events for connection management
+  'connect': () => void;
+  'disconnect': (reason: string) => void;
+  'connect_error': (error: Error) => void;
+  'reconnect': (attemptNumber: number) => void;
+  'reconnect_error': (error: Error) => void;
+  'reconnect_failed': () => void;
+  'reconnecting': (attemptNumber: number) => void;
 }
 
 export interface ClientToServerEvents {
