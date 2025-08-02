@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply bg-gray-900 text-white;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary hover:bg-primary-dark text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50;
+  }
+  
+  .btn-success {
+    @apply bg-success hover:bg-success-dark text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-success focus:ring-opacity-50;
+  }
+  
+  .btn-danger {
+    @apply bg-danger hover:bg-danger-dark text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-danger focus:ring-opacity-50;
+  }
+  
+  .btn-warning {
+    @apply bg-warning hover:bg-warning-dark text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-warning focus:ring-opacity-50;
+  }
+  
+  .status-indicator {
+    @apply inline-flex items-center px-2 py-1 rounded-full text-xs font-medium;
+  }
+  
+  .status-connected {
+    @apply bg-success bg-opacity-20 text-success border border-success border-opacity-30;
+  }
+  
+  .status-disconnected {
+    @apply bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30;
+  }
+  
+  .status-connecting {
+    @apply bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30;
+  }
+}
+
+@layer utilities {
+  .glass-effect {
+    @apply bg-white bg-opacity-10 backdrop-blur-md border border-white border-opacity-20;
+  }
+  
+  .video-container {
+    @apply relative aspect-video bg-gray-800 rounded-lg overflow-hidden;
+  }
+  
+  .loading-dots::after {
+    content: '';
+    animation: loading-dots 1.5s infinite;
+  }
+}
+
+@keyframes loading-dots {
+  0%, 20% {
+    content: '.';
+  }
+  40% {
+    content: '..';
+  }
+  60%, 100% {
+    content: '...';
+  }
+}
