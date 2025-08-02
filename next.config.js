@@ -5,8 +5,6 @@ const nextConfig = {
   },
   // Disable strict mode for WebRTC compatibility
   reactStrictMode: false,
-  // Enable SWC minification for better performance
-  swcMinify: true,
   // Configure headers for WebRTC and Socket.IO
   async headers() {
     return [
