@@ -31,11 +31,11 @@ export function initializeSocket(): Socket<ServerToClientEvents, ClientToServerE
       console.error('Socket.IO connection error:', error);
     });
     
-    socket.on('reconnect', (attemptNumber) => {
+    socket.on('reconnect', (attemptNumber: number) => {
       console.log('Socket.IO reconnected after', attemptNumber, 'attempts');
     });
     
-    socket.on('reconnect_error', (error) => {
+    socket.on('reconnect_error', (error: Error) => {
       console.error('Socket.IO reconnection error:', error);
     });
     

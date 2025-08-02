@@ -189,10 +189,13 @@ export default function BroadcastPage() {
       localStreamRef.current = stream;
       
       // Handle screen share end (user clicks browser stop button)
-      stream.getVideoTracks()[0].addEventListener('ended', () => {
-        console.log('Screen share ended by user');
-        stopStreaming();
-      });
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.addEventListener('ended', () => {
+          console.log('Screen share ended by user');
+          stopStreaming();
+        });
+      }
       
       // Display local video
       if (videoRef.current) {

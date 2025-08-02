@@ -1,4 +1,4 @@
-import { NextApiRequest, NextApiResponse } from 'next';
+import { NextApiRequest } from 'next';
 import { Server as NetServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { 
@@ -9,8 +9,8 @@ import {
   SignalingData 
 } from '@/types';
 
-// Extend NextApiResponse to include socket server
-interface NextApiResponseServerIO extends NextApiResponse {
+// Simplified NextApiResponse interface for Socket.IO
+interface NextApiResponseWithSocket {
   socket: {
     server: NetServer & {
       io?: SocketIOServer<
@@ -21,6 +21,7 @@ interface NextApiResponseServerIO extends NextApiResponse {
       >;
     };
   };
+  end: () => void;
 }
 
 // Store active streams and viewer counts
@@ -32,7 +33,7 @@ const activeStreams = new Map<string, {
 
 export default function SocketHandler(
   req: NextApiRequest, 
-  res: NextApiResponseServerIO
+  res: NextApiResponseWithSocket
 ) {
   // Initialize Socket.IO server if not already done
   if (!res.socket.server.io) {

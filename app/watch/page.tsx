@@ -16,7 +16,8 @@ import {
   setupViewerListeners,
   leaveStream,
   disconnectSocket,
-  isSocketConnected
+  isSocketConnected,
+  getSocket
 } from '@/lib/socket';
 import { ConnectionState, PeerConnectionState } from '@/types';
 import StreamStatus from '@/components/StreamStatus';
@@ -123,30 +124,35 @@ export default function WatchPage() {
         peerConnectionRef.current.addEventListener('track', (event) => {
           console.log('Received remote track:', event.track.kind);
           const [remoteStream] = event.streams;
-          remoteStreamRef.current = remoteStream;
-          
-          if (videoRef.current) {
-            videoRef.current.srcObject = remoteStream;
-            setIsReceivingVideo(true);
+          if (remoteStream) {
+            remoteStreamRef.current = remoteStream;
+            
+            if (videoRef.current) {
+              videoRef.current.srcObject = remoteStream;
+              setIsReceivingVideo(true);
+            }
           }
         });
         
         // Handle connection state changes
         peerConnectionRef.current.addEventListener('connectionstatechange', () => {
-          const state = getPeerConnectionState(peerConnectionRef.current!);
-          console.log('Connection state changed:', state.connectionState);
-          
-          if (state.connectionState === 'connected') {
-            setConnectionState(prev => ({
-              ...prev,
-              connectionStatus: 'connected',
-            }));
-          } else if (state.connectionState === 'failed' || state.connectionState === 'disconnected') {
-            setConnectionState(prev => ({
-              ...prev,
-              connectionStatus: 'disconnected',
-            }));
-            setIsReceivingVideo(false);
+          const peerConnection = peerConnectionRef.current;
+          if (peerConnection) {
+            const state = getPeerConnectionState(peerConnection);
+            console.log('Connection state changed:', state.connectionState);
+            
+            if (state.connectionState === 'connected') {
+              setConnectionState(prev => ({
+                ...prev,
+                connectionStatus: 'connected',
+              }));
+            } else if (state.connectionState === 'failed' || state.connectionState === 'disconnected') {
+              setConnectionState(prev => ({
+                ...prev,
+                connectionStatus: 'disconnected',
+              }));
+              setIsReceivingVideo(false);
+            }
           }
         });
       }
@@ -157,7 +163,9 @@ export default function WatchPage() {
       await peerConnectionRef.current.setLocalDescription(answer);
       
       // Send answer back to broadcaster
-      sendAnswer(answer, STREAM_ID, socket.id || 'viewer');
+      const socket = getSocket();
+      const socketId = socket?.id || 'viewer';
+      sendAnswer(answer, STREAM_ID, socketId);
       
       setIsStreamActive(true);
       
