@@ -16,7 +16,10 @@ export default function SocketHandler(req, res) {
       cors: {
         origin: '*', // Open CORS - tighten this in production
         methods: ['GET', 'POST'],
+        credentials: false,
       },
+      allowEIO3: true,
+      transports: ['websocket', 'polling'],
     });
     
     // Store active connections and their roles
@@ -32,6 +35,9 @@ export default function SocketHandler(req, res) {
         role: null, // 'broadcaster' or 'viewer'
         streamId: null,
       });
+
+      // Send confirmation that connection is established
+      socket.emit('connected', { socketId: socket.id });
       
       /**
        * Handle broadcaster events
@@ -39,21 +45,27 @@ export default function SocketHandler(req, res) {
       
       // Broadcaster starts streaming
       socket.on('start-broadcast', (data) => {
-        console.log('🎥 Broadcaster started:', socket.id);
+        console.log('🎥 Broadcaster started:', socket.id, 'Stream ID:', data?.streamId);
         
         // Update connection role
         const connection = connections.get(socket.id);
         if (connection) {
           connection.role = 'broadcaster';
-          connection.streamId = data.streamId || 'default';
+          connection.streamId = data?.streamId || 'default';
         }
         
         // Join broadcaster to their own room
         socket.join('broadcasters');
+        socket.join(`stream-${connection.streamId}`);
         
         // Notify all viewers that a stream is available
         socket.broadcast.emit('stream-available', {
           broadcasterId: socket.id,
+          streamId: connection?.streamId,
+        });
+
+        // Confirm to broadcaster
+        socket.emit('broadcast-started', {
           streamId: connection?.streamId,
         });
       });
@@ -62,16 +74,20 @@ export default function SocketHandler(req, res) {
       socket.on('stop-broadcast', () => {
         console.log('🛑 Broadcaster stopped:', socket.id);
         
+        const connection = connections.get(socket.id);
+        
         // Notify all viewers that stream ended
         socket.broadcast.emit('stream-ended', {
           broadcasterId: socket.id,
         });
         
-        // Leave broadcaster room
+        // Leave broadcaster rooms
         socket.leave('broadcasters');
+        if (connection?.streamId) {
+          socket.leave(`stream-${connection.streamId}`);
+        }
         
         // Update connection role
-        const connection = connections.get(socket.id);
         if (connection) {
           connection.role = null;
           connection.streamId = null;
@@ -105,6 +121,9 @@ export default function SocketHandler(req, res) {
             broadcasterId: activeBroadcaster.id,
             streamId: activeBroadcaster.streamId,
           });
+        } else {
+          // No active stream
+          socket.emit('no-active-stream');
         }
       });
       
@@ -118,7 +137,7 @@ export default function SocketHandler(req, res) {
         console.log('📤 Relaying offer from broadcaster:', socket.id);
         
         // Broadcast offer to all connected viewers
-        socket.broadcast.emit('offer', {
+        socket.broadcast.to('viewers').emit('offer', {
           offer,
           broadcasterId: socket.id,
         });
@@ -137,7 +156,7 @@ export default function SocketHandler(req, res) {
       
       // Relay ICE candidates between peers
       socket.on('ice-candidate', (data) => {
-        console.log('🧊 Relaying ICE candidate from:', socket.id);
+        console.log('🧊 Relaying ICE candidate from:', socket.id, 'to:', data.targetId || 'broadcast');
         
         // Relay ICE candidate to the target peer
         if (data.targetId) {
@@ -152,6 +171,22 @@ export default function SocketHandler(req, res) {
             fromId: socket.id,
           });
         }
+      });
+
+      /**
+       * Status and info events
+       */
+      socket.on('get-status', () => {
+        const activeBroadcasters = Array.from(connections.values())
+          .filter(conn => conn.role === 'broadcaster').length;
+        const activeViewers = Array.from(connections.values())
+          .filter(conn => conn.role === 'viewer').length;
+
+        socket.emit('status-update', {
+          broadcasters: activeBroadcasters,
+          viewers: activeViewers,
+          totalConnections: connections.size,
+        });
       });
       
       /**
@@ -172,11 +207,19 @@ export default function SocketHandler(req, res) {
         // Clean up connection data
         connections.delete(socket.id);
       });
+
+      /**
+       * Error handling
+       */
+      socket.on('error', (error) => {
+        console.error('Socket error for client:', socket.id, error);
+        socket.emit('error', { message: 'Server error occurred' });
+      });
     });
     
     // Attach the Socket.IO server to the Next.js server
     res.socket.server.io = io;
-    console.log('✅ Socket.IO signaling server initialized');
+    console.log('✅ Socket.IO signaling server initialized on path: /api/socket_io');
   } else {
     console.log('♻️ Socket.IO server already running');
   }

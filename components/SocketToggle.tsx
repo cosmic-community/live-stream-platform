@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { 
   initializeSocket, 
   disconnectSocket, 
-  isSocketConnected 
+  isSocketConnected,
+  getSocket
 } from '@/lib/socket';
 
 interface SocketToggleProps {
@@ -14,6 +15,7 @@ interface SocketToggleProps {
 export default function SocketToggle({ onConnectionChange }: SocketToggleProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // Check initial connection status
@@ -24,41 +26,53 @@ export default function SocketToggle({ onConnectionChange }: SocketToggleProps) 
 
   const handleConnect = async () => {
     setIsConnecting(true);
+    setError(null);
     
     try {
       const socket = initializeSocket();
       
       // Wait for connection to establish
-      await new Promise((resolve, reject) => {
+      await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
-          reject(new Error('Connection timeout'));
+          reject(new Error('Connection timeout - check if server is running'));
         }, 10000); // 10 second timeout
 
-        socket.on('connect', () => {
+        const onConnect = () => {
           clearTimeout(timeout);
+          socket.off('connect', onConnect);
+          socket.off('connect_error', onConnectError);
           setIsConnected(true);
           setIsConnecting(false);
           onConnectionChange(true);
-          resolve(true);
-        });
+          resolve();
+        };
 
-        socket.on('connect_error', (error) => {
+        const onConnectError = (error: Error) => {
           clearTimeout(timeout);
+          socket.off('connect', onConnect);
+          socket.off('connect_error', onConnectError);
           setIsConnecting(false);
-          reject(error);
-        });
+          reject(new Error(`Connection failed: ${error.message}`));
+        };
+
+        socket.on('connect', onConnect);
+        socket.on('connect_error', onConnectError);
 
         // If already connected, resolve immediately
         if (socket.connected) {
           clearTimeout(timeout);
+          socket.off('connect', onConnect);
+          socket.off('connect_error', onConnectError);
           setIsConnected(true);
           setIsConnecting(false);
           onConnectionChange(true);
-          resolve(true);
+          resolve();
         }
       });
     } catch (error) {
       console.error('Failed to connect socket:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown connection error';
+      setError(errorMessage);
       setIsConnecting(false);
       setIsConnected(false);
       onConnectionChange(false);
@@ -69,7 +83,13 @@ export default function SocketToggle({ onConnectionChange }: SocketToggleProps) 
     disconnectSocket();
     setIsConnected(false);
     setIsConnecting(false);
+    setError(null);
     onConnectionChange(false);
+  };
+
+  const getSocketId = () => {
+    const socket = getSocket();
+    return socket?.id || 'Not connected';
   };
 
   return (
@@ -100,13 +120,30 @@ export default function SocketToggle({ onConnectionChange }: SocketToggleProps) 
           </div>
         </div>
 
+        {/* Socket ID */}
+        {isConnected && (
+          <div className="flex items-center justify-between">
+            <span className="text-gray-400 text-sm">Socket ID:</span>
+            <span className="text-xs text-blue-400 font-mono">
+              {getSocketId()}
+            </span>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+            <p className="text-red-400 text-sm">{error}</p>
+          </div>
+        )}
+
         {/* Connection Toggle Button */}
         <div className="pt-2">
           {!isConnected ? (
             <button
               onClick={handleConnect}
               disabled={isConnecting}
-              className="btn-success w-full flex items-center justify-center space-x-2 py-2"
+              className="btn-success w-full flex items-center justify-center space-x-2 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="text-lg">🔌</span>
               <span>{isConnecting ? 'Connecting...' : 'Connect Socket'}</span>
@@ -128,12 +165,14 @@ export default function SocketToggle({ onConnectionChange }: SocketToggleProps) 
             {!isConnected ? (
               <>
                 <p>• Socket must be connected to start streaming</p>
+                <p>• Server endpoint: /api/socket_io</p>
                 <p>• Click "Connect Socket" to establish connection</p>
               </>
             ) : (
               <>
                 <p>• Socket connection established</p>
                 <p>• Ready to start streaming</p>
+                <p>• Using WebSocket transport</p>
               </>
             )}
           </div>

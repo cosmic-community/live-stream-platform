@@ -1,5 +1,4 @@
 import { io, Socket } from 'socket.io-client';
-import { SocketEvents } from '@/types';
 
 let socket: Socket | null = null;
 
@@ -11,15 +10,16 @@ export function initializeSocket(): Socket {
     return socket;
   }
   
-  const serverUrl = process.env.NODE_ENV === 'production' 
-    ? window.location.origin 
-    : 'http://localhost:3000';
+  // Connect to the Socket.IO server running on /api/socket_io
+  const serverUrl = typeof window !== 'undefined' ? window.location.origin : '';
   
   socket = io(serverUrl, {
-    path: '/socket.io',
+    path: '/api/socket_io',
     transports: ['websocket', 'polling'],
     upgrade: true,
     rememberUpgrade: true,
+    forceNew: false,
+    timeout: 10000,
   });
   
   socket.on('connect', () => {
@@ -63,77 +63,65 @@ export function disconnectSocket(): void {
 }
 
 // Broadcaster functions
-export function joinAsBroadcaster(streamId: string): void {
-  socket?.emit('join-broadcaster', streamId);
-  console.log('Joined as broadcaster for stream:', streamId);
+export function startBroadcast(streamId: string): void {
+  socket?.emit('start-broadcast', { streamId });
+  console.log('Started broadcast for stream:', streamId);
 }
 
-export function sendOffer(offer: RTCSessionDescriptionInit, streamId: string): void {
-  socket?.emit('offer', offer, streamId);
-  console.log('Sent offer for stream:', streamId);
+export function stopBroadcast(): void {
+  socket?.emit('stop-broadcast');
+  console.log('Stopped broadcast');
 }
 
-export function sendIceCandidate(candidate: RTCIceCandidateInit, streamId: string): void {
-  socket?.emit('ice-candidate-broadcaster', candidate, streamId);
-  console.log('Sent ICE candidate for stream:', streamId);
+export function sendOffer(offer: RTCSessionDescriptionInit): void {
+  socket?.emit('offer', offer);
+  console.log('Sent WebRTC offer');
 }
 
-export function endStream(streamId: string): void {
-  socket?.emit('end-stream', streamId);
-  console.log('Ended stream:', streamId);
+export function sendIceCandidate(candidate: RTCIceCandidateInit, targetId?: string): void {
+  socket?.emit('ice-candidate', { candidate, targetId });
+  console.log('Sent ICE candidate', targetId ? `to ${targetId}` : 'broadcast');
 }
 
 // Viewer functions
-export function joinAsViewer(streamId: string): void {
-  socket?.emit('join-viewer', streamId);
-  console.log('Joined as viewer for stream:', streamId);
+export function joinAsViewer(): void {
+  socket?.emit('join-as-viewer');
+  console.log('Joined as viewer');
 }
 
-export function sendAnswer(answer: RTCSessionDescriptionInit, streamId: string, viewerId: string): void {
-  socket?.emit('answer', answer, streamId, viewerId);
-  console.log('Sent answer for stream:', streamId, 'as viewer:', viewerId);
-}
-
-export function sendViewerIceCandidate(candidate: RTCIceCandidateInit, streamId: string): void {
-  socket?.emit('ice-candidate-viewer', candidate, streamId);
-  console.log('Sent viewer ICE candidate for stream:', streamId);
-}
-
-export function leaveStream(streamId: string): void {
-  socket?.emit('leave-viewer', streamId);
-  console.log('Left stream:', streamId);
+export function sendAnswer(answer: RTCSessionDescriptionInit, broadcasterId: string): void {
+  socket?.emit('answer', { answer, broadcasterId });
+  console.log('Sent answer to broadcaster:', broadcasterId);
 }
 
 // Event listeners setup
 export function setupBroadcasterListeners(
-  onAnswer: (answer: RTCSessionDescriptionInit, viewerId: string) => void,
-  onIceCandidate: (candidate: RTCIceCandidateInit, viewerId: string) => void,
-  onViewerCount: (count: number) => void,
+  onAnswer: (data: { answer: RTCSessionDescriptionInit; viewerId: string }) => void,
+  onIceCandidate: (data: { candidate: RTCIceCandidateInit; fromId: string }) => void,
   onError: (message: string) => void
 ): void {
   if (!socket) return;
   
   socket.on('answer', onAnswer);
-  socket.on('ice-candidate-viewer', onIceCandidate);
-  socket.on('viewer-count', onViewerCount);
+  socket.on('ice-candidate', onIceCandidate);
   socket.on('error', onError);
   
   console.log('Broadcaster listeners setup');
 }
 
 export function setupViewerListeners(
-  onOffer: (offer: RTCSessionDescriptionInit) => void,
-  onIceCandidate: (candidate: RTCIceCandidateInit) => void,
-  onStreamEnd: () => void,
-  onStreamStatus: (isActive: boolean) => void,
+  onOffer: (data: { offer: RTCSessionDescriptionInit; broadcasterId: string }) => void,
+  onIceCandidate: (data: { candidate: RTCIceCandidateInit; fromId: string }) => void,
+  onStreamAvailable: (data: { broadcasterId: string; streamId: string }) => void,
+  onStreamEnded: (data: { broadcasterId: string }) => void,
   onError: (message: string) => void
 ): void {
   if (!socket) return;
   
   socket.on('offer', onOffer);
-  socket.on('ice-candidate-broadcaster', onIceCandidate);
-  socket.on('stream-end', onStreamEnd);
-  socket.on('stream-status', onStreamStatus);
+  socket.on('ice-candidate', onIceCandidate);
+  socket.on('stream-available', onStreamAvailable);
+  socket.on('stream-ended', onStreamEnded);
   socket.on('error', onError);
   
   console.log('Viewer listeners setup');
