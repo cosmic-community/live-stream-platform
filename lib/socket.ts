@@ -73,6 +73,20 @@ export function stopBroadcast(): void {
   console.log('Stopped broadcast');
 }
 
+/**
+ * Join as broadcaster - alias for startBroadcast for compatibility
+ */
+export function joinAsBroadcaster(streamId: string): void {
+  startBroadcast(streamId);
+}
+
+/**
+ * End stream - alias for stopBroadcast for compatibility
+ */
+export function endStream(): void {
+  stopBroadcast();
+}
+
 export function sendOffer(offer: RTCSessionDescriptionInit): void {
   socket?.emit('offer', offer);
   console.log('Sent WebRTC offer');
@@ -87,6 +101,14 @@ export function sendIceCandidate(candidate: RTCIceCandidateInit, targetId?: stri
 export function joinAsViewer(): void {
   socket?.emit('join-as-viewer');
   console.log('Joined as viewer');
+}
+
+/**
+ * Leave stream - disconnect from current stream
+ */
+export function leaveStream(): void {
+  socket?.emit('leave-stream');
+  console.log('Left stream');
 }
 
 export function sendAnswer(answer: RTCSessionDescriptionInit, broadcasterId: string): void {
