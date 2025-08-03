@@ -68,23 +68,19 @@ export function startBroadcast(streamId: string): void {
   console.log('Started broadcast for stream:', streamId);
 }
 
+export function joinAsBroadcaster(streamId: string): void {
+  socket?.emit('join-as-broadcaster', { streamId });
+  console.log('Joined as broadcaster for stream:', streamId);
+}
+
 export function stopBroadcast(): void {
   socket?.emit('stop-broadcast');
   console.log('Stopped broadcast');
 }
 
-/**
- * Join as broadcaster - alias for startBroadcast for compatibility
- */
-export function joinAsBroadcaster(streamId: string): void {
-  startBroadcast(streamId);
-}
-
-/**
- * End stream - alias for stopBroadcast for compatibility
- */
 export function endStream(): void {
-  stopBroadcast();
+  socket?.emit('end-stream');
+  console.log('Ended stream');
 }
 
 export function sendOffer(offer: RTCSessionDescriptionInit): void {
@@ -103,9 +99,6 @@ export function joinAsViewer(): void {
   console.log('Joined as viewer');
 }
 
-/**
- * Leave stream - disconnect from current stream
- */
 export function leaveStream(): void {
   socket?.emit('leave-stream');
   console.log('Left stream');
