@@ -98,7 +98,7 @@ export default function WatchPage() {
       if (peerConnectionRef.current) {
         peerConnectionRef.current.close();
       }
-      leaveStream(STREAM_ID);
+      leaveStream();
       disconnectSocket();
     };
   }, []);
