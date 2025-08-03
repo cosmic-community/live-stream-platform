@@ -66,8 +66,8 @@ export default function WatchPage() {
       }));
       
       if (connected) {
-        // Join as viewer when connected
-        joinAsViewer(STREAM_ID);
+        // Join as viewer when connected - no arguments needed
+        joinAsViewer();
       }
     };
     
@@ -231,7 +231,7 @@ export default function WatchPage() {
     // Reinitialize connection
     setTimeout(() => {
       if (isSocketConnected()) {
-        joinAsViewer(STREAM_ID);
+        joinAsViewer();
       }
       setIsConnecting(false);
     }, 1000);
