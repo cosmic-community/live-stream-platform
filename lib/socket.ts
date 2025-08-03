@@ -1,48 +1,38 @@
 import { io, Socket } from 'socket.io-client';
-import { ClientToServerEvents, ServerToClientEvents } from '@/types';
+import { SocketEvents } from '@/types';
 
-// Socket.IO client instance
-let socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
+let socket: Socket | null = null;
 
 /**
  * Initialize Socket.IO connection
  */
-export function initializeSocket(): Socket<ServerToClientEvents, ClientToServerEvents> {
-  if (!socket) {
-    socket = io({
-      transports: ['websocket', 'polling'],
-      autoConnect: true,
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      timeout: 20000,
-    });
-    
-    // Connection event handlers
-    socket.on('connect', () => {
-      console.log('Socket.IO connected:', socket?.id);
-    });
-    
-    socket.on('disconnect', (reason) => {
-      console.log('Socket.IO disconnected:', reason);
-    });
-    
-    socket.on('connect_error', (error) => {
-      console.error('Socket.IO connection error:', error);
-    });
-    
-    socket.on('reconnect', (attemptNumber: number) => {
-      console.log('Socket.IO reconnected after', attemptNumber, 'attempts');
-    });
-    
-    socket.on('reconnect_error', (error: Error) => {
-      console.error('Socket.IO reconnection error:', error);
-    });
-    
-    socket.on('reconnect_failed', () => {
-      console.error('Socket.IO reconnection failed');
-    });
+export function initializeSocket(): Socket {
+  if (socket?.connected) {
+    return socket;
   }
+  
+  const serverUrl = process.env.NODE_ENV === 'production' 
+    ? window.location.origin 
+    : 'http://localhost:3000';
+  
+  socket = io(serverUrl, {
+    path: '/socket.io',
+    transports: ['websocket', 'polling'],
+    upgrade: true,
+    rememberUpgrade: true,
+  });
+  
+  socket.on('connect', () => {
+    console.log('Socket.IO connected:', socket?.id);
+  });
+  
+  socket.on('disconnect', (reason) => {
+    console.log('Socket.IO disconnected:', reason);
+  });
+  
+  socket.on('connect_error', (error) => {
+    console.error('Socket.IO connection error:', error);
+  });
   
   return socket;
 }
@@ -50,8 +40,15 @@ export function initializeSocket(): Socket<ServerToClientEvents, ClientToServerE
 /**
  * Get current socket instance
  */
-export function getSocket(): Socket<ServerToClientEvents, ClientToServerEvents> | null {
+export function getSocket(): Socket | null {
   return socket;
+}
+
+/**
+ * Check if socket is connected
+ */
+export function isSocketConnected(): boolean {
+  return socket?.connected || false;
 }
 
 /**
@@ -61,123 +58,69 @@ export function disconnectSocket(): void {
   if (socket) {
     socket.disconnect();
     socket = null;
+    console.log('Socket.IO disconnected');
   }
 }
 
-/**
- * Join streaming room as broadcaster
- */
+// Broadcaster functions
 export function joinAsBroadcaster(streamId: string): void {
-  if (socket) {
-    socket.emit('start-stream', streamId);
-    console.log('Joined as broadcaster for stream:', streamId);
-  }
+  socket?.emit('join-broadcaster', streamId);
+  console.log('Joined as broadcaster for stream:', streamId);
 }
 
-/**
- * Join streaming room as viewer
- */
-export function joinAsViewer(streamId: string): void {
-  if (socket) {
-    socket.emit('join-stream', streamId);
-    console.log('Joined as viewer for stream:', streamId);
-  }
-}
-
-/**
- * Leave streaming room
- */
-export function leaveStream(streamId: string): void {
-  if (socket) {
-    socket.emit('leave-stream', streamId);
-    console.log('Left stream:', streamId);
-  }
-}
-
-/**
- * Send WebRTC offer to viewers
- */
 export function sendOffer(offer: RTCSessionDescriptionInit, streamId: string): void {
-  if (socket) {
-    socket.emit('offer', {
-      type: 'offer',
-      sdp: offer,
-      streamId,
-    });
-    console.log('Sent offer for stream:', streamId);
-  }
+  socket?.emit('offer', offer, streamId);
+  console.log('Sent offer for stream:', streamId);
 }
 
-/**
- * Send WebRTC answer to broadcaster
- */
-export function sendAnswer(answer: RTCSessionDescriptionInit, streamId: string, viewerId: string): void {
-  if (socket) {
-    socket.emit('answer', {
-      type: 'answer',
-      sdp: answer,
-      streamId,
-      viewerId,
-    });
-    console.log('Sent answer for stream:', streamId);
-  }
+export function sendIceCandidate(candidate: RTCIceCandidateInit, streamId: string): void {
+  socket?.emit('ice-candidate-broadcaster', candidate, streamId);
+  console.log('Sent ICE candidate for stream:', streamId);
 }
 
-/**
- * Send ICE candidate
- */
-export function sendIceCandidate(candidate: RTCIceCandidateInit, streamId: string, viewerId?: string): void {
-  if (socket) {
-    socket.emit('ice-candidate', {
-      type: 'ice-candidate',
-      candidate,
-      streamId,
-      viewerId,
-    });
-    console.log('Sent ICE candidate for stream:', streamId);
-  }
-}
-
-/**
- * End streaming session
- */
 export function endStream(streamId: string): void {
-  if (socket) {
-    socket.emit('end-stream', streamId);
-    console.log('Ended stream:', streamId);
-  }
+  socket?.emit('end-stream', streamId);
+  console.log('Ended stream:', streamId);
 }
 
-/**
- * Setup broadcaster event listeners
- */
+// Viewer functions
+export function joinAsViewer(streamId: string): void {
+  socket?.emit('join-viewer', streamId);
+  console.log('Joined as viewer for stream:', streamId);
+}
+
+export function sendAnswer(answer: RTCSessionDescriptionInit, streamId: string, viewerId: string): void {
+  socket?.emit('answer', answer, streamId, viewerId);
+  console.log('Sent answer for stream:', streamId, 'as viewer:', viewerId);
+}
+
+export function sendViewerIceCandidate(candidate: RTCIceCandidateInit, streamId: string): void {
+  socket?.emit('ice-candidate-viewer', candidate, streamId);
+  console.log('Sent viewer ICE candidate for stream:', streamId);
+}
+
+export function leaveStream(streamId: string): void {
+  socket?.emit('leave-viewer', streamId);
+  console.log('Left stream:', streamId);
+}
+
+// Event listeners setup
 export function setupBroadcasterListeners(
   onAnswer: (answer: RTCSessionDescriptionInit, viewerId: string) => void,
   onIceCandidate: (candidate: RTCIceCandidateInit, viewerId: string) => void,
-  onViewerCountUpdate: (count: number) => void,
+  onViewerCount: (count: number) => void,
   onError: (message: string) => void
 ): void {
   if (!socket) return;
   
-  socket.on('answer', (data) => {
-    if (data.sdp && data.viewerId) {
-      onAnswer(data.sdp, data.viewerId);
-    }
-  });
-  
-  socket.on('ice-candidate', (data) => {
-    if (data.candidate && data.viewerId) {
-      onIceCandidate(data.candidate, data.viewerId);
-    }
-  });
-  
-  socket.on('viewer-count', onViewerCountUpdate);
+  socket.on('answer', onAnswer);
+  socket.on('ice-candidate-viewer', onIceCandidate);
+  socket.on('viewer-count', onViewerCount);
   socket.on('error', onError);
+  
+  console.log('Broadcaster listeners setup');
 }
 
-/**
- * Setup viewer event listeners
- */
 export function setupViewerListeners(
   onOffer: (offer: RTCSessionDescriptionInit) => void,
   onIceCandidate: (candidate: RTCIceCandidateInit) => void,
@@ -187,35 +130,19 @@ export function setupViewerListeners(
 ): void {
   if (!socket) return;
   
-  socket.on('offer', (data) => {
-    if (data.sdp) {
-      onOffer(data.sdp);
-    }
-  });
-  
-  socket.on('ice-candidate', (data) => {
-    if (data.candidate) {
-      onIceCandidate(data.candidate);
-    }
-  });
-  
-  socket.on('end-stream', onStreamEnd);
+  socket.on('offer', onOffer);
+  socket.on('ice-candidate-broadcaster', onIceCandidate);
+  socket.on('stream-end', onStreamEnd);
   socket.on('stream-status', onStreamStatus);
   socket.on('error', onError);
+  
+  console.log('Viewer listeners setup');
 }
 
-/**
- * Remove all event listeners
- */
+// Clean up event listeners
 export function removeAllListeners(): void {
   if (socket) {
     socket.removeAllListeners();
+    console.log('Removed all socket listeners');
   }
-}
-
-/**
- * Check if socket is connected
- */
-export function isSocketConnected(): boolean {
-  return socket?.connected ?? false;
 }

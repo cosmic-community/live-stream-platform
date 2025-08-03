@@ -1,101 +1,115 @@
-import { StreamConfig, MediaState, PeerConnectionState } from '@/types';
+import { MediaState, PeerConnectionState, WebRTCSupport, StreamConfig } from '@/types';
 
-// WebRTC configuration with STUN server
-export const RTC_CONFIGURATION: RTCConfiguration = {
+// WebRTC configuration
+const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
   ],
-  iceCandidatePoolSize: 10,
 };
 
-// Media constraints for different streaming modes
-export const MEDIA_CONSTRAINTS = {
-  camera: {
-    video: {
-      width: { ideal: 1280, max: 1920 },
-      height: { ideal: 720, max: 1080 },
-      frameRate: { ideal: 30, max: 60 },
-    },
-    audio: {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-    },
+// Default stream configurations
+const DEFAULT_CAMERA_CONFIG: StreamConfig = {
+  video: {
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+    frameRate: { ideal: 30 },
   },
-  screen: {
-    video: {
-      width: { ideal: 1920, max: 3840 },
-      height: { ideal: 1080, max: 2160 },
-      frameRate: { ideal: 30, max: 60 },
-    },
-    audio: true,
+  audio: {
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
   },
-} as const;
+};
+
+const DEFAULT_SCREEN_CONFIG: StreamConfig = {
+  video: {
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+    frameRate: { ideal: 30 },
+  },
+  audio: true,
+};
 
 /**
- * Creates a new RTCPeerConnection with proper configuration
+ * Check WebRTC support in the current browser
  */
-export function createPeerConnection(): RTCPeerConnection {
-  const peerConnection = new RTCPeerConnection(RTC_CONFIGURATION);
+export function checkWebRTCSupport(): WebRTCSupport {
+  const missing: string[] = [];
   
-  // Log connection state changes for debugging
-  peerConnection.addEventListener('connectionstatechange', () => {
-    console.log('Connection state:', peerConnection.connectionState);
-  });
+  if (!window.RTCPeerConnection) {
+    missing.push('RTCPeerConnection');
+  }
   
-  peerConnection.addEventListener('iceconnectionstatechange', () => {
-    console.log('ICE connection state:', peerConnection.iceConnectionState);
-  });
+  if (!navigator.mediaDevices) {
+    missing.push('mediaDevices');
+  }
   
-  peerConnection.addEventListener('signalingstatechange', () => {
-    console.log('Signaling state:', peerConnection.signalingState);
-  });
+  if (!navigator.mediaDevices?.getUserMedia) {
+    missing.push('getUserMedia');
+  }
   
-  return peerConnection;
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    missing.push('getDisplayMedia');
+  }
+  
+  return {
+    supported: missing.length === 0,
+    missing,
+  };
 }
 
 /**
- * Requests camera access with optimal settings
+ * Create a new RTCPeerConnection with ICE servers
+ */
+export function createPeerConnection(): RTCPeerConnection {
+  return new RTCPeerConnection(ICE_SERVERS);
+}
+
+/**
+ * Get camera stream with default configuration
  */
 export async function getCameraStream(): Promise<MediaStream> {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia(MEDIA_CONSTRAINTS.camera);
-    console.log('Camera stream acquired:', stream.getTracks().map(t => ({ kind: t.kind, enabled: t.enabled })));
+    const stream = await navigator.mediaDevices.getUserMedia(DEFAULT_CAMERA_CONFIG);
+    console.log('Camera stream obtained:', stream.getTracks().map(t => t.kind));
     return stream;
   } catch (error) {
-    console.error('Error accessing camera:', error);
-    throw new Error('Failed to access camera. Please check permissions.');
+    console.error('Error getting camera stream:', error);
+    
+    // Try with basic configuration if advanced fails
+    try {
+      const fallbackStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+      console.log('Fallback camera stream obtained');
+      return fallbackStream;
+    } catch (fallbackError) {
+      throw new Error(`Camera access denied or unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 }
 
 /**
- * Requests screen share access with optimal settings
+ * Get screen share stream with default configuration
  */
 export async function getScreenStream(): Promise<MediaStream> {
   try {
-    const stream = await navigator.mediaDevices.getDisplayMedia(MEDIA_CONSTRAINTS.screen);
-    console.log('Screen stream acquired:', stream.getTracks().map(t => ({ kind: t.kind, enabled: t.enabled })));
+    const stream = await navigator.mediaDevices.getDisplayMedia(DEFAULT_SCREEN_CONFIG);
+    console.log('Screen stream obtained:', stream.getTracks().map(t => t.kind));
     return stream;
   } catch (error) {
-    console.error('Error accessing screen:', error);
-    throw new Error('Failed to access screen. Please check permissions.');
+    console.error('Error getting screen stream:', error);
+    throw new Error(`Screen sharing denied or unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 /**
- * Adds media stream tracks to peer connection
+ * Add stream to peer connection
  */
 export function addStreamToPeerConnection(peerConnection: RTCPeerConnection, stream: MediaStream): void {
-  // Remove existing tracks first to avoid conflicts
-  const senders = peerConnection.getSenders();
-  senders.forEach(sender => {
-    if (sender.track) {
-      peerConnection.removeTrack(sender);
-    }
-  });
-  
-  // Add new tracks
   stream.getTracks().forEach(track => {
     peerConnection.addTrack(track, stream);
     console.log('Added track to peer connection:', track.kind);
@@ -103,19 +117,17 @@ export function addStreamToPeerConnection(peerConnection: RTCPeerConnection, str
 }
 
 /**
- * Stops all tracks in a media stream
+ * Stop all tracks in a media stream
  */
-export function stopMediaStream(stream: MediaStream | null): void {
-  if (stream) {
-    stream.getTracks().forEach(track => {
-      track.stop();
-      console.log('Stopped track:', track.kind);
-    });
-  }
+export function stopMediaStream(stream: MediaStream): void {
+  stream.getTracks().forEach(track => {
+    track.stop();
+    console.log('Stopped track:', track.kind);
+  });
 }
 
 /**
- * Gets current media state from stream
+ * Get current media state from stream
  */
 export function getMediaState(stream: MediaStream | null): MediaState {
   if (!stream) {
@@ -130,62 +142,77 @@ export function getMediaState(stream: MediaStream | null): MediaState {
   const videoTracks = stream.getVideoTracks();
   const audioTracks = stream.getAudioTracks();
   
+  // Determine if it's camera or screen based on track constraints
+  const hasScreen = videoTracks.some(track => {
+    const settings = track.getSettings();
+    return settings.displaySurface !== undefined;
+  });
+  
   return {
-    hasCamera: videoTracks.some(track => track.label.toLowerCase().includes('camera')),
-    hasScreen: videoTracks.some(track => track.label.toLowerCase().includes('screen')),
+    hasCamera: videoTracks.length > 0 && !hasScreen,
+    hasScreen: hasScreen,
     isAudioEnabled: audioTracks.some(track => track.enabled),
     isVideoEnabled: videoTracks.some(track => track.enabled),
   };
 }
 
 /**
- * Gets peer connection state information
+ * Get peer connection state information
  */
 export function getPeerConnectionState(peerConnection: RTCPeerConnection): PeerConnectionState {
   return {
     connectionState: peerConnection.connectionState,
     iceConnectionState: peerConnection.iceConnectionState,
+    iceGatheringState: peerConnection.iceGatheringState,
     signalingState: peerConnection.signalingState,
   };
 }
 
 /**
- * Toggles audio track enabled state
+ * Toggle audio track enabled state
  */
-export function toggleAudio(stream: MediaStream | null, enabled: boolean): void {
-  if (stream) {
-    stream.getAudioTracks().forEach(track => {
-      track.enabled = enabled;
-    });
+export function toggleAudio(stream: MediaStream, enabled: boolean): void {
+  stream.getAudioTracks().forEach(track => {
+    track.enabled = enabled;
+  });
+}
+
+/**
+ * Toggle video track enabled state
+ */
+export function toggleVideo(stream: MediaStream, enabled: boolean): void {
+  stream.getVideoTracks().forEach(track => {
+    track.enabled = enabled;
+  });
+}
+
+/**
+ * Get media stream statistics
+ */
+export async function getStreamStats(peerConnection: RTCPeerConnection): Promise<RTCStatsReport | null> {
+  try {
+    return await peerConnection.getStats();
+  } catch (error) {
+    console.error('Error getting stream stats:', error);
+    return null;
   }
 }
 
 /**
- * Toggles video track enabled state
+ * Replace video track in peer connection (useful for switching between camera and screen)
  */
-export function toggleVideo(stream: MediaStream | null, enabled: boolean): void {
-  if (stream) {
-    stream.getVideoTracks().forEach(track => {
-      track.enabled = enabled;
-    });
+export async function replaceVideoTrack(
+  peerConnection: RTCPeerConnection,
+  newTrack: MediaStreamTrack
+): Promise<void> {
+  const sender = peerConnection.getSenders().find(s => 
+    s.track && s.track.kind === 'video'
+  );
+  
+  if (sender) {
+    await sender.replaceTrack(newTrack);
+    console.log('Replaced video track');
+  } else {
+    throw new Error('No video sender found to replace track');
   }
-}
-
-/**
- * Checks if browser supports required WebRTC features
- */
-export function checkWebRTCSupport(): { supported: boolean; missing: string[] } {
-  const missing: string[] = [];
-  
-  if (!navigator.mediaDevices) missing.push('mediaDevices');
-  if (!navigator.mediaDevices?.getUserMedia) missing.push('getUserMedia');
-  if (!navigator.mediaDevices?.getDisplayMedia) missing.push('getDisplayMedia');
-  if (!window.RTCPeerConnection) missing.push('RTCPeerConnection');
-  if (!window.RTCSessionDescription) missing.push('RTCSessionDescription');
-  if (!window.RTCIceCandidate) missing.push('RTCIceCandidate');
-  
-  return {
-    supported: missing.length === 0,
-    missing,
-  };
 }
