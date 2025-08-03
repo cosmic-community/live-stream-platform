@@ -28,6 +28,7 @@ import StreamStatus from '@/components/StreamStatus';
 import MediaControls from '@/components/MediaControls';
 import ViewerStats from '@/components/ViewerStats';
 import ErrorAlert from '@/components/ErrorAlert';
+import SocketToggle from '@/components/SocketToggle';
 
 const STREAM_ID = 'main-stream'; // Fixed stream ID for simplicity
 
@@ -49,6 +50,7 @@ export default function BroadcastPage() {
   
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
+  const [socketConnected, setSocketConnected] = useState(false);
   
   // Refs for WebRTC components
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -64,35 +66,35 @@ export default function BroadcastPage() {
     }
   }, []);
   
-  // Initialize Socket.IO connection
+  // Setup socket event listeners when connected
   useEffect(() => {
-    const socket = initializeSocket();
+    if (socketConnected) {
+      // Setup broadcaster-specific listeners
+      setupBroadcasterListeners(
+        handleAnswer,
+        handleIceCandidate,
+        handleViewerCountUpdate,
+        handleError
+      );
+      
+      console.log('Socket listeners setup complete');
+    }
+  }, [socketConnected]);
+  
+  // Handle socket connection changes
+  const handleSocketConnectionChange = (connected: boolean) => {
+    setSocketConnected(connected);
+    setConnectionState(prev => ({
+      ...prev,
+      isConnected: connected,
+      connectionStatus: connected ? 'connected' : 'disconnected',
+    }));
     
-    const updateConnectionStatus = () => {
-      setConnectionState(prev => ({
-        ...prev,
-        isConnected: isSocketConnected(),
-        connectionStatus: isSocketConnected() ? 'connected' : 'disconnected',
-      }));
-    };
-    
-    socket.on('connect', updateConnectionStatus);
-    socket.on('disconnect', updateConnectionStatus);
-    
-    // Setup broadcaster-specific listeners
-    setupBroadcasterListeners(
-      handleAnswer,
-      handleIceCandidate,
-      handleViewerCountUpdate,
-      handleError
-    );
-    
-    updateConnectionStatus();
-    
-    return () => {
-      disconnectSocket();
-    };
-  }, []);
+    // If disconnected while streaming, stop the stream
+    if (!connected && connectionState.isStreaming) {
+      stopStreaming();
+    }
+  };
   
   // Handle WebRTC answer from viewer
   const handleAnswer = async (answer: RTCSessionDescriptionInit, viewerId: string) => {
@@ -136,6 +138,11 @@ export default function BroadcastPage() {
   
   // Start camera streaming
   const startCamera = async () => {
+    if (!socketConnected) {
+      setError('Socket must be connected before starting stream');
+      return;
+    }
+    
     setIsLoading(true);
     setError('');
     
@@ -175,6 +182,11 @@ export default function BroadcastPage() {
   
   // Start screen sharing
   const startScreenShare = async () => {
+    if (!socketConnected) {
+      setError('Socket must be connected before starting stream');
+      return;
+    }
+    
     setIsLoading(true);
     setError('');
     
@@ -275,8 +287,10 @@ export default function BroadcastPage() {
       });
       viewerConnectionsRef.current.clear();
       
-      // End stream via Socket.IO
-      endStream(STREAM_ID);
+      // End stream via Socket.IO (only if still connected)
+      if (socketConnected) {
+        endStream(STREAM_ID);
+      }
       
       // Update state
       setMediaState({
@@ -332,7 +346,10 @@ export default function BroadcastPage() {
         )}
         
         {/* Status Row */}
-        <div className="grid md:grid-cols-3 gap-4 mb-8">
+        <div className="grid md:grid-cols-4 gap-4 mb-8">
+          <SocketToggle 
+            onConnectionChange={handleSocketConnectionChange}
+          />
           <StreamStatus 
             connectionState={connectionState}
             mediaState={mediaState}
@@ -373,9 +390,15 @@ export default function BroadcastPage() {
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 rounded-lg">
                     <div className="text-center">
                       <div className="text-4xl mb-2">📹</div>
-                      <p className="text-gray-300">
-                        Click "Start Camera" or "Start Screen Share" to begin
-                      </p>
+                      {!socketConnected ? (
+                        <p className="text-gray-300">
+                          Connect socket first, then start streaming
+                        </p>
+                      ) : (
+                        <p className="text-gray-300">
+                          Click "Start Camera" or "Start Screen Share" to begin
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -400,8 +423,8 @@ export default function BroadcastPage() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-400">Socket Status:</span>
-                  <span className={connectionState.isConnected ? 'text-green-400' : 'text-red-400'}>
-                    {connectionState.isConnected ? 'Connected' : 'Disconnected'}
+                  <span className={socketConnected ? 'text-green-400' : 'text-red-400'}>
+                    {socketConnected ? 'Connected' : 'Disconnected'}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -423,11 +446,12 @@ export default function BroadcastPage() {
             <div className="glass-effect p-4 rounded-lg">
               <h3 className="font-semibold text-white mb-3">How to Stream</h3>
               <ol className="text-sm text-gray-300 space-y-2">
-                <li>1. Click "Start Camera" or "Start Screen Share"</li>
-                <li>2. Allow browser permissions when prompted</li>
-                <li>3. Share the watch URL with your viewers</li>
-                <li>4. Monitor viewer count and connection status</li>
-                <li>5. Click "End Stream" when finished</li>
+                <li>1. Click "Connect Socket" to establish connection</li>
+                <li>2. Click "Start Camera" or "Start Screen Share"</li>
+                <li>3. Allow browser permissions when prompted</li>
+                <li>4. Share the watch URL with your viewers</li>
+                <li>5. Monitor viewer count and connection status</li>
+                <li>6. Click "End Stream" when finished</li>
               </ol>
             </div>
           </div>

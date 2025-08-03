@@ -129,6 +129,7 @@ export default function MediaControls({
         <ul className="text-xs text-gray-400 space-y-1">
           {!isStreaming ? (
             <>
+              <li>• Ensure socket is connected first</li>
               <li>• Choose camera for personal streaming</li>
               <li>• Choose screen share for presentations</li>
               <li>• Allow browser permissions when prompted</li>
