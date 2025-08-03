@@ -177,12 +177,12 @@ export default function WatchPage() {
     }
   };
   
-  // Handle ICE candidate from broadcaster
-  const handleIceCandidate = async (candidate: RTCIceCandidateInit) => {
+  // Handle ICE candidate from broadcaster - Fixed function signature to match expected type
+  const handleIceCandidate = async (data: { candidate: RTCIceCandidateInit; fromId: string; }) => {
     try {
       if (peerConnectionRef.current) {
-        await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-        console.log('Added ICE candidate from broadcaster');
+        await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
+        console.log('Added ICE candidate from broadcaster:', data.fromId);
       }
     } catch (error) {
       console.error('Error handling ICE candidate:', error);
