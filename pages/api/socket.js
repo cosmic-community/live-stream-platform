@@ -9,17 +9,21 @@ export default function SocketHandler(req, res) {
   if (!res.socket.server.io) {
     console.log('🚀 Initializing Socket.IO signaling server...');
     
-    // Create Socket.IO server with custom path and CORS settings
+    // Create Socket.IO server with proper configuration
     const io = new Server(res.socket.server, {
-      path: '/api/socket_io',
+      path: '/api/socketio',
       addTrailingSlash: false,
       cors: {
-        origin: '*', // Open CORS - tighten this in production
+        origin: process.env.NODE_ENV === 'production' 
+          ? [process.env.VERCEL_URL, process.env.NEXT_PUBLIC_SITE_URL].filter(Boolean)
+          : '*',
         methods: ['GET', 'POST'],
         credentials: false,
       },
       allowEIO3: true,
       transports: ['websocket', 'polling'],
+      pingTimeout: 60000,
+      pingInterval: 25000,
     });
     
     // Store active connections and their roles
@@ -217,9 +221,14 @@ export default function SocketHandler(req, res) {
       });
     });
     
+    // Handle server-level errors
+    io.engine.on('connection_error', (err) => {
+      console.error('Socket.IO connection error:', err.req, err.code, err.message, err.context);
+    });
+    
     // Attach the Socket.IO server to the Next.js server
     res.socket.server.io = io;
-    console.log('✅ Socket.IO signaling server initialized on path: /api/socket_io');
+    console.log('✅ Socket.IO signaling server initialized on path: /api/socketio');
   } else {
     console.log('♻️ Socket.IO server already running');
   }
