@@ -73,8 +73,7 @@ export default function BroadcastPage() {
       setupBroadcasterListeners(
         handleAnswer,
         handleIceCandidate,
-        handleViewerCountUpdate,
-        handleError
+        handleViewerCountUpdate
       );
       
       console.log('Socket listeners setup complete');
@@ -120,6 +119,8 @@ export default function BroadcastPage() {
       }
     } catch (error) {
       console.error('Error handling ICE candidate:', error);
+      // Handle error by setting state instead of passing to a fourth parameter
+      setError('Failed to handle ICE candidate');
     }
   };
   
