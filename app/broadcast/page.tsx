@@ -306,7 +306,7 @@ export default function BroadcastPage() {
       
       // End stream via Socket.IO (only if still connected)
       if (socketConnected) {
-        endStream(STREAM_ID);
+        endStream(); // Fixed: removed STREAM_ID argument to match function signature
       }
       
       // Update state
