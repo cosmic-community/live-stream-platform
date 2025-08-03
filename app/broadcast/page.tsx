@@ -272,7 +272,8 @@ export default function BroadcastPage() {
     // Create and send offer
     const offer = await peerConnectionRef.current.createOffer();
     await peerConnectionRef.current.setLocalDescription(offer);
-    sendOffer(offer, STREAM_ID);
+    // Fix: sendOffer expects only one argument (the offer object)
+    sendOffer(offer);
   };
   
   // Stop streaming
