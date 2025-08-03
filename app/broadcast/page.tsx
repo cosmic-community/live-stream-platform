@@ -95,9 +95,10 @@ export default function BroadcastPage() {
     }
   };
   
-  // Handle WebRTC answer from viewer
-  const handleAnswer = async (answer: RTCSessionDescriptionInit, viewerId: string) => {
+  // Handle WebRTC answer from viewer - Updated to match expected signature
+  const handleAnswer = async (data: { answer: RTCSessionDescriptionInit; viewerId: string }) => {
     try {
+      const { answer, viewerId } = data;
       const viewerConnection = viewerConnectionsRef.current.get(viewerId);
       if (viewerConnection) {
         await viewerConnection.setRemoteDescription(new RTCSessionDescription(answer));
@@ -109,9 +110,10 @@ export default function BroadcastPage() {
     }
   };
   
-  // Handle ICE candidate from viewer
-  const handleIceCandidate = async (candidate: RTCIceCandidateInit, viewerId: string) => {
+  // Handle ICE candidate from viewer - Updated to match expected signature
+  const handleIceCandidate = async (data: { candidate: RTCIceCandidateInit; viewerId: string }) => {
     try {
+      const { candidate, viewerId } = data;
       const viewerConnection = viewerConnectionsRef.current.get(viewerId);
       if (viewerConnection) {
         await viewerConnection.addIceCandidate(new RTCIceCandidate(candidate));
@@ -119,7 +121,6 @@ export default function BroadcastPage() {
       }
     } catch (error) {
       console.error('Error handling ICE candidate:', error);
-      // Handle error by setting state instead of passing to a fourth parameter
       setError('Failed to handle ICE candidate');
     }
   };
