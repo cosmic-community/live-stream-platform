@@ -95,7 +95,7 @@ export default function BroadcastPage() {
     }
   };
   
-  // Handle WebRTC answer from viewer - Updated to match expected signature
+  // Handle WebRTC answer from viewer
   const handleAnswer = async (data: { answer: RTCSessionDescriptionInit; viewerId: string }) => {
     try {
       const { answer, viewerId } = data;
@@ -110,14 +110,14 @@ export default function BroadcastPage() {
     }
   };
   
-  // Handle ICE candidate from viewer - Updated to match expected signature
-  const handleIceCandidate = async (data: { candidate: RTCIceCandidateInit; viewerId: string }) => {
+  // Handle ICE candidate from viewer - Updated to match socket listener signature
+  const handleIceCandidate = async (data: { candidate: RTCIceCandidateInit; fromId: string }) => {
     try {
-      const { candidate, viewerId } = data;
-      const viewerConnection = viewerConnectionsRef.current.get(viewerId);
+      const { candidate, fromId } = data;
+      const viewerConnection = viewerConnectionsRef.current.get(fromId);
       if (viewerConnection) {
         await viewerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-        console.log('Added ICE candidate for viewer:', viewerId);
+        console.log('Added ICE candidate for viewer:', fromId);
       }
     } catch (error) {
       console.error('Error handling ICE candidate:', error);
