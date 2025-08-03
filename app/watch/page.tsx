@@ -164,10 +164,8 @@ export default function WatchPage() {
       const answer = await peerConnectionRef.current.createAnswer();
       await peerConnectionRef.current.setLocalDescription(answer);
       
-      // Send answer back to broadcaster
-      const socket = getSocket();
-      const socketId = socket?.id || 'viewer';
-      sendAnswer(answer, STREAM_ID, socketId);
+      // Send answer back to broadcaster - Fixed to use only 2 parameters
+      sendAnswer(answer, STREAM_ID);
       
       setIsStreamActive(true);
       
