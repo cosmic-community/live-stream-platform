@@ -103,11 +103,13 @@ export default function WatchPage() {
     };
   }, []);
   
-  // Handle WebRTC offer from broadcaster
-  const handleOffer = async (offer: RTCSessionDescriptionInit) => {
+  // Handle WebRTC offer from broadcaster - Updated function signature to match expected type
+  const handleOffer = async (data: { offer: RTCSessionDescriptionInit; broadcasterId: string; }) => {
     try {
       setError('');
-      console.log('Received offer from broadcaster');
+      console.log('Received offer from broadcaster:', data.broadcasterId);
+      
+      const { offer } = data;
       
       // Create peer connection if not exists
       if (!peerConnectionRef.current) {
