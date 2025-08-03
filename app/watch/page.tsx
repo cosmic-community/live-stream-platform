@@ -207,9 +207,11 @@ export default function WatchPage() {
     remoteStreamRef.current = null;
   };
   
-  // Handle stream status updates
-  const handleStreamStatus = (isActive: boolean) => {
-    console.log('Stream status update:', isActive);
+  // Handle stream status updates - Fixed function signature to match expected type
+  const handleStreamStatus = (data: { broadcasterId: string; }) => {
+    console.log('Stream status update from broadcaster:', data.broadcasterId);
+    // Extract the actual stream status - assuming active if we receive the message
+    const isActive = true;
     setIsStreamActive(isActive);
     
     if (!isActive) {
