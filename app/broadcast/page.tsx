@@ -73,7 +73,7 @@ export default function BroadcastPage() {
       setupBroadcasterListeners(
         handleAnswer,
         handleIceCandidate,
-        handleViewerCountUpdate
+        handleViewerCountUpdateWrapper
       );
       
       console.log('Socket listeners setup complete');
@@ -131,6 +131,20 @@ export default function BroadcastPage() {
       ...prev,
       viewerCount: count,
     }));
+  };
+  
+  // Wrapper function to match socket listener signature (message: string) => void
+  const handleViewerCountUpdateWrapper = (message: string) => {
+    try {
+      const count = parseInt(message, 10);
+      if (!isNaN(count)) {
+        handleViewerCountUpdate(count);
+      } else {
+        console.warn('Invalid viewer count received:', message);
+      }
+    } catch (error) {
+      console.error('Error parsing viewer count:', error);
+    }
   };
   
   // Handle Socket.IO errors
